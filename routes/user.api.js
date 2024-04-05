@@ -5,7 +5,7 @@ const {
   createUser,
   getAllUsers,
   getUserByName,
-  assignResponsible,
+  getAssign,
 } = require("../controllers/user.controllers.js");
 
 /** Get all users
@@ -45,12 +45,8 @@ router.post("/", validateUser(), createUser);
 
 // get tasks by target userid:
 const validateTask = () => {
-  return [
-    param("userName", "Invalid user name").notEmpty().isString(),
-    param("taskId", "Invalid task ID").notEmpty().isMongoId(),
-  ];
+  return param("id", "Invalid task ID").notEmpty().isMongoId();
 };
-
-router.put("/assign/:userName/:taskId", validateTask(), assignResponsible);
+router.get("/assign/:id", validateTask(), getAssign);
 
 module.exports = router;

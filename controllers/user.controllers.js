@@ -55,6 +55,14 @@ userController.getUserByName = async (req, res, next) => {
 userController.createUser = async (req, res, next) => {
   const { name, role } = req.body;
   try {
+    const existingUser = await User.findOne({ name: name });
+    if (existingUser) {
+      throw new AppError(
+        400,
+        "User with this name already exists",
+        "Create User Error"
+      );
+    }
     const result = validationResult(req);
     if (result.isEmpty()) {
       const created = await User.create({ name: name, role: role });
@@ -70,27 +78,30 @@ userController.createUser = async (req, res, next) => {
   }
 };
 
-userController.assignResponsible = async (req, res, next) => {
+userController.getAssign = async (req, res, next) => {
   try {
-    const { userName, taskId } = req.params;
+    const { id } = req.params;
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new AppError(400, "Invalid Task ID", "Assign Task Error");
     }
 
-    const task = await Task.findById(taskId);
-    if (!task) {
-      throw new AppError(404, "Task not found", "Assign Task Error");
-    }
+    // const task = await Task.findById(id);
+    // if (!task) {
+    //   throw new AppError(404, "Task not found", "Assign Task Error");
+    // }
 
-    const userUpdate = await User.findOneAndUpdate(
-      { name: userName },
-      { $addToSet: { taskResponsible: task._id } },
-      { new: true }
+    // const userUpdate = await User.findOneAndUpdate(
+    //   { name: userName },
+    //   { $addToSet: { taskResponsible: task._id } },
+    //   { new: true }
+    // );
+    const userUpdate = await User.findOne({ _id: id }).populate(
+      "taskResponsible"
     );
 
     if (!userUpdate) {

@@ -42,6 +42,13 @@ taskController.getTaskById = async (req, res, next) => {
     if (ObjectId.isValid(id)) {
       if (String(new ObjectId(id)) === id) {
         const task = await Task.findOne({ _id: id }).populate("assignedTo");
+        if (!task) {
+          throw new AppError(
+            404,
+            "Task not found or being deleted",
+            "Get Task Error"
+          );
+        }
         sendResponse(res, 200, true, task, null, "Get task successfully");
       } else {
         throw new AppError(400, "Invalid Id", "Get Task Error");
@@ -87,8 +94,8 @@ taskController.getAllTasks = async (req, res, next) => {
 
 // assign task
 taskController.assignTask = async (req, res, next) => {
+  const { userName, taskId } = req.params;
   try {
-    const { userName, taskId } = req.params;
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -96,7 +103,11 @@ taskController.assignTask = async (req, res, next) => {
     if (!ObjectId.isValid(taskId)) {
       throw new AppError(400, "Invalid Task ID", "Assign Task Error");
     }
-    const user = await User.findOne({ name: userName });
+    const user = await User.findOneAndUpdate(
+      { name: userName },
+      { $addToSet: { taskResponsible: taskId } },
+      { new: true }
+    );
 
     if (!user) {
       throw new AppError(404, "User not found", "Assign Task Error");
@@ -106,6 +117,7 @@ taskController.assignTask = async (req, res, next) => {
       { $set: { assignedTo: user._id } },
       { new: true }
     );
+
     if (!taskUpdate) {
       throw new AppError(404, "Task not found", "Assign Task Error");
     }
@@ -113,7 +125,7 @@ taskController.assignTask = async (req, res, next) => {
       res,
       200,
       true,
-      { taskUpdate },
+      { taskUpdate, user },
       null,
       "Assign Task Successfully"
     );
@@ -133,7 +145,11 @@ taskController.unassignTask = async (req, res, next) => {
     if (!ObjectId.isValid(taskId)) {
       throw new AppError(400, "Invalid Task ID", "Assign Task Error");
     }
-    const user = await User.findOne({ name: userName });
+    const user = await User.findOneAndUpdate(
+      { name: userName },
+      { $addToSet: { taskResponsible: null } },
+      { new: true }
+    );
 
     if (!user) {
       throw new AppError(404, "User not found", "Unassign Task Error");
@@ -204,18 +220,18 @@ taskController.deleteTask = async (req, res, next) => {
     if (!ObjectId.isValid(id)) {
       throw new AppError(400, "Invalid Task ID", "Delete Task Error");
     }
-    const query = await Task.findById(id);
-    if (!query) {
+    const deletedTask = await Task.findByIdAndDelete(id);
+    if (!deletedTask) {
       throw new AppError(404, "Task not found", "Delete Task Error");
     }
-    if (query.status === "done") {
+    if (deletedTask.status === "done") {
       throw new AppError(
         400,
         "Can't delete task set to done",
         "Delete Task Error"
       );
     }
-    const deletedTask = await Task.findByIdAndUpdate(id, { isDeleted: true });
+    deletedTask.isDeleted = true;
     sendResponse(res, 200, true, deletedTask, null, "Delete Task Successfully");
   } catch (err) {
     next(err);
